@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  selabapi:
+#    container_name: selabapi
+    deploy:
+      replicas: 2
+    build:
+      context: .
+    ports:
+      - "8000"
+    volumes:
+      - './:/app'
+    networks:
+      - selab_network
+
+  nginx:
+    container_name: selabx
+    build:
+      context: .
+      dockerfile: ./DockerfileNginx
+    restart: always
+    ports:
+      - "8088:80"
+    depends_on:
+      - selabapi
+    networks:
+      - selab_network
+
+networks:
+  selab_network:
+    external: true
