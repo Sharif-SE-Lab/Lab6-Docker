@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  model:
+    container_name: selabmodel
+    build:
+      context: .
+    command: nameko run --config nameko_configs.yml facades
+    volumes:
+      - './:/app'
+    networks:
+      - selab_network
+
+networks:
+  selab_network:
+    external: true
