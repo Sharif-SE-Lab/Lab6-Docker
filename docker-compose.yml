@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+
+  postgres:
+    container_name: selabgres
+    restart: always
+    image: postgres:9.5
+    ports:
+      - "5432"
+    environment:
+      - POSTGRES_USER=selabgres
+      - POSTGRES_PASSWORD=selabgres
+      - POSTGRES_DB=selabgres
+    volumes:
+      - /home/postgres/selab:/var/lib/postgresql/data
+    networks:
+      - selab_network
+
+  rabbitmq:
+    container_name: selabmq
+    image: rabbitmq:3.11.5-management
+    ports:
+      - "15684:15672"
+      - "5684:5672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    restart: always
+    networks:
+      - selab_network
+
+networks:
+  selab_network:
+    name: selab_network
