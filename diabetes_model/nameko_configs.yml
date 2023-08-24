@@ -1,0 +1,2 @@
+AMQP_URI: amqp://guest:guest@selabmq:5672/
+max_workers: 20
