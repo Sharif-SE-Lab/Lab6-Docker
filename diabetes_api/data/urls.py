@@ -9,7 +9,7 @@ urlpatterns = [
     path('patient/<int:pk>/', PatientObservationView.as_view({
         'get': 'retrieve',
         'patch': 'update',
-        'delete': 'delete',
+        'delete': 'destroy',
     })),
     path('patient/<int:pk>/predict/', PatientRequestForPrediction.as_view({
         'patch': 'update',
