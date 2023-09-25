@@ -1,236 +1,113 @@
-# آزمایش ششم: استفاده از Docker
-## شرح آزمایش
-در این آزمایش قصد داریم نحوه کار با
-Docker
-به عنوان یک ابزار 
-Orchestration
-و
-Deployment
-را بیاموزیم. به این منظور یک نیازمندی تعریف کرده، و برای آن یک سیستم نرم‌افزاری میکروسرویس ایجاد می‌کنیم.
+# Lab 6: Utilizing Docker
+## Problem Definition
+We intend to learn how to use Docker as an Orchestration and Deployment tool. As a result, We define a set of real-world requirements and design a software system that realizes those requirements.
 
-## تحلیل نیازمندی‌ها
-درمانگاهی یک مدل یادگیری ماشین روی داده‌های دیابت بیماران درخواست کرده است.
-قرار است همه روزه نتیجه آزمایش چندین بیمار در این سیستم ثبت شود و سیستم در طول زمان به یادگیری داده‌های بیماران ادامه دهد.\
-همچنین لازم است سیستم قابلیت پیشبینی نتیجه آزمایش بیمار را داشته باشد تا پزشکان درمانگاه گاها پیش از آماده شدن نتیجه اصلی آزمایش، از پیش‌بینی مدل یادگیری ماشین استفاده کنند.\
-تمام ارتباطات با این سیستم باید از طریق یک
-RESTfull API
-محقق شود و نیازی به طراحی و ایجاد یک کارخواهِ
-Front-End
-برای این سیستم نیست چرا که قرار است زیرسیستم
-Front-End
-برون سپاری شود. سیستم باید دارای یک load-balancer معقول باشد تا در زمان‌های پیک مراجعین، دسترسی پذیری دچار آسیب نشود.
-## طراحی سیستم نرم‌افزاری
-به منظور ایجاد معماری سیستم از یک نگاه بالا به پایین
-(Top-Down)
-استفاده می‌کنیم. به این منظور ابتدا یک نمودار استقرار طراحی می‌کنیم سپس ذیل گره‌های نمودار استقرار، نمودار مولفه سیستم را طراحی خواهیم کرد.\
-### نمودار استقرار
-ابتدا یک گره به منظور فراهم آوردن
-RESTfull API
-خواسته شده قرار می‌دهیم. این گره را پشتِ
-NGINX
-که یک
-Load-balancing WebServer
-قرار می‌دهیم.
-همچنین به منظور آنکه داده‌های بیماران به صورت مانا
-(Persistent)
-حفظ شود، گره‌ی
-API
-را در ارتباط با یک دیتابیس
-PostgreSQL
-قرار می‌دهیم.
+# Requirements Analysis
+A clinic has requested **a machine learning model for diabetes patient data**. The system is expected to **record the results** of multiple patients' tests on a daily basis, and the system should continue to **learn from patient data over time**.
 
+Additionally, the system needs to have **the capability to predict the test results** for patients so that the clinic's physicians can sometimes use the machine learning model's predictions before the actual test results are available.
+
+All communications with this system should be realized through a **RESTful API**, and there is no need to design and create a Front-End interface for this system, as the Front-End subsystem is going to be outsourced. The system should have a reasonable **load balancer** to ensure accessibility is not compromised during peak patient visit times.
+
+# Software System Design
+We leverage a Top-Down view to describe the designed system. Consequently, we first propose a top-level deployment diagram. Furthermore, we provide component diagrams for each of the deployment diagram nodes.
+
+## Deployment Diagram
+Initially, we develop a deployable node for the RESTful API that was requested. We hide this node behind an NGINX service, a well-known load-balancing web server. Additionally, we utilize a PostgreSQL database to preserve the patient data in a persistent storage.
 
 ![deployment diagram part 1](<./resources/deployment_diagram_pt1.png>)
 
-همانطور که قابل مشاهده است از گره‌ی
-API
-دو نسخه به صورت همزمان مستقر شده است و تقسیم‌کننده‌ی بارِ
-NGINX
-با سیاست 
-least_conn
-بار را بین این دو نسخه تقسیم می‌کند (طبق این سیاست، هر درخواست از کارگزار، به نسخه‌ای داده می‌شود که در لحظه در حال خدمت‌رسانی به تعداد کمتری درخواست باشد). همچنین این گره‌ی
-API
-با استفاده از چارچوب
-Django
-پیاده‌سازی شده است.\
-پس از آن، یک مدل یادگیری ماشین رگرسیون خطی نیاز است که داده‌های بیماران را رفته رفته یاد گرفته و برای پیش‌بینی دیابت نیز استفاده شود.
+As it is figured above, two instances of the `SELabAPI` gets deployed and the load balancer (NGINX) distributes the requests across the deployed instances with a `least_conn` policy; according to this policy, each request will be assigned to the node that is currently handling the minimum number of requests.
 
+Furthermore, a simple regression model is required for learning and predicting the clinic data.
 
 ![deployment diagram part 2](./resources/deployment_diagram_pt2.png)
-این مدل با پایتون ایجاد شده است و نحوه خدمت گرفتن از آن از طریق یک واسطِ پیامِ
-RabbitMQ
-محقق می‌شود. به این شکل گره‌ی
-API
-با کمترین اتصالات
-(Coupling)
-با مدلِ یادگیری ماشین ارتباط خواهد گرفت.
 
-**در ادامه تصویر کلیِ نمودار استقرار را مشاهده خواهید کرد.**
+This model is implemented in Python. Other services can require its service through a RabbitMQ instance. As a result, the `API` node will use its service with minimum possible coupling.
 
+**The overall deployment diagram of the whole system is represented bellow.**
 
 ![deployment diagram](./resources/deployment_diagram.jpg)
 
-دو مولفه‌ی زیرسیستم
-(Subsystem، به معنی بالا-رده ترین مولفه‌ی نرم‌افزاری که روی گره‌ی استقرار می‌شیند. شایان توجه است که به دلیل ساختار تو در تو داشتن نمودار مولفه، چنین تعریفی کاربردی است.)
-که در نمودار استقرار قابل مشاهده‌اند، زیرسیستم
-API
-و
-Model
-می‌باشند که آن‌ها را در **نمودار مولفه** بررسی می‌کنیم.
-### نمودار مولفه
+Two subsystem components exist in the above diagram (`API` and `Model`) that will be further discussed in the component diagram section; the word subsystem implies the top-level components that will be executed on each node.
 
-در ادامه نمودار‌ مولفه ایجاد شده ذکر می‌شوند که درک تدقیق شده‌ای از پیاده‌سازی سیستم نرم‌افزاری به ما می‌دهد.
+## Component Diagram
+For having a more refined view of the software system, we further study the component-level design of this system.
 
-مولفه‌ی مدل از زیرمولفه‌های زیر تشکیل شده است.
-- Regression: مدل رگرسیون که به منظور یادگیری داده‌های دیابت استفاده خواهد شد.
-- DataLoader: مولفه بارگذاری داده روی مدل‌های یادگیری ماشین.
-- FeatureCleanser: مولفه پاکسازی و تنظیم فیچرهای یادگیری ماشین.
-- Services: مولفه‌ای که مولفه‌های دیگر را کنار هم می‌گذارد و خدمات مورد نیاز برای یادگیری و پیش‌بینی بیماران دیابتی را فراهم می‌آورد.
+### `Model`
+This component will be responsible to train the machine-learning models. It can also load previously trained models from disk if they exist or create new ones otherwise.
+It consists of the following subcomponents:
+- Regression: contains the regression model that trains and predicts on the diabetes patient data.
+- DataLoader: this component is responsible for loading the data on the ML model.
+- FeatureCleanser: cleanse the features of the dataset.
+- Services: the wrapper that integrates all other subcomponents and provides the external service of the `Model` component.
 
-این مولفه دو واسط برای خدمات گیری به نام
-ModelFacade
-و
-ModelConfigurationFacade
-ارائه می‌دهد. نمای اول به منظور درخواستِ یادگیری و پیش‌بینی مدل استفاده می‌شود و نمای دوم به منظور تنظیم
-Hyperparameter
-های مدل استفاده خواهد شد.\
-این نما
-(facade)
-ها با استفاده از پکیج
-[nameko](https://www.nameko.io/)
-ایجاد شده‌اند و استفاده از متد‌های آن‌ها در واقع با روش
-RPC (Remote procedure call)
-و از طریق واسطِ پیامِ
-RabbitMQ
-ممکن خواهد بود.
+`Model` provides two Facades (interfaces) for requiring its services, `ModelFacade` and `ModelConfigurationFacade`. The first one is further used to train and predict the new data that comes from the `API`. The second one can be used for changing the hyper-parameters of the model.
+This Facades are implemented by utilizing the [nameko](https://www.nameko.io/) framework and using their methods (class operations) is further realized through RPC over AMQP. Moreover, queues of RabbitMQ are used due to storing the RPC messages.
 
 ![component diagram part 1](./resources/component_diagram_pt1.png)
 
-در ادامه مولفه‌ی
-API
-را خواهیم داشت که ذیل خود یک مولفه
-DjangoServer
-و یک مولفه‌ی
-uWSGI
-خواهد داشت.
-مولفه‌ی
-uWSGI
-به عنوان
-Gateway
-پایتونی ما عمل خواهد کرد و درخواست‌ها و پاسخ‌های سرور را به سمت مولفه‌ی بیرونیِ
-NGINX
-رد می‌کند.\
-همچنین مولفه‌ی
-API
-از طریق زیر مولفه‌ی
-Model
-درون خود، از واسط‌های زیرسیستم
-Model (شامل مدل یادگیری ماشین)،
-که این واسط‌ها همان
-ModelFacade
-و
-ModelConfigurationFacade
-هستند استفاده می‌کند.
+Moreover, a RESTful API is implemented in Django Rest Framework. the django server is further hidden behind a uWSGI gateway. uWSGI stands between th `NGINX` and `API` components. The `API` component also requires the facades provided by `Model` for giving the services to the external clients.
 
 ![component diagram part 2](./resources/component_diagram_pt2.png)
 
-**در ادامه تصویر کلیِ نمودار مولفه را مشاهده خواهید کرد.**
+**The following figure illustrates the component diagram of the whole system.**
 
 ![component diagram](./resources/component_diagram.jpg)
 
-## اجرای سیستم
-پروژه شامل سه فایل پیکربندیِ
-docker-compose
-و دو فایل پیکربندی
-Dockerfile
-می‌باشد.
-پیکربندِ اولی که راه اندازی می‌کنیم
-docker-compose.yml
-در کف پروژه (کنار همین فایل README) می‌باشد.
-به منظور استقرار این پیکربند از دستور زیر استفاده شده است.
+## Building and Installation
+The project consists of three docker-compose files. the first configuration that we launch is the one located in the root of the project (next to this README file). It builds the Postgres and RabbitMQ components of the system alongside the docker network used across different services.
 ```bash
 $ docker-compose up --build --detach
 ```
-
 ![first deploy](./resources/deploy/first_docker_compose.png)
 
-در این پیکربند، گره‌های
-Postgres
-و
-RabbitMQ
-که در مولفه‌های زیر سیستم پروژه استفاده می‌شوند، به همراه شبکه‌ی داکری مستقر می‌شوند (برای شناخت گره‌های استقرار به بالاتر در این مستند و زیربخشِ نمودار استقرار مراجعه کنید).\
-دستورِ
-`docker ps`
-که در ادامه‌ی هر استقرار استفاده می‌شود، اثبات کننده صحت مستقر بودن این نگهدارنده‌ها
-(container)
-می‌باشد. البته توجه شود در این مستند خیلی مواقع از دستورِ زیر بجای `docker ps` استفاده شده است:
+We also use the following command instead of `docker ps` to get a brief status of the docker containers that we only care about in this project.
 ```bash
 $ docker ps --format "table {{.Image}}  {{.Ports}}  {{.Names}}" | grep "selab"
-```
-استفاده از تابعِ
-grep
-به این منظور است که تنها نگهدارنده‌های این پروژه نمایش شود (سیستمی که روی آن پروژه را مستقر می‌کنیم پروژه‌های داکری زیادی در حال اجرا دارد). پرچمِ
-`format`
-به منظور نمایش اندک توضیحاتی از نگهدارنده است که مورد نیاز ما است.
-
-پیکربندِ دومی که راه اندازی می‌کنیم در پوشه‌ی مولفه‌ی
-API
-قرار گرفته است
-(اسم پوشه: diabetes_api).
-این پیکربند، مولفه‌ی گره‌های
-API
-و 
-NGINX
-را مستقر می‌سازد.
-طبق پیکربندی داده شده به NGINX، این کارگزار وب روی پورت 8088 از localhost خدمت می‌رساند، و درخواست‌ها را بین دو نسخه از گره‌ی API که مستقر شده است بالانس می‌کند.
+``` 
+The second configuration that we launch is located in the API component folder (directory name: diabetes_api). This configuration deploys the components of API nodes and NGINX. According to the provided configuration for NGINX, this web proxy serves on port 8088 of localhost and balances requests between two instances of the deployed API node.
 
 ![second deploy](./resources/deploy/second_docker_compose.png)
 
-و در آخر پیکربندِ مربوط به گره‌ی Model را مستقر می‌سازیم.
-پردازه‌های حاصل از استقرار در واقع درخواست‌هایی که روی نما (facade) های مولفه‌ی ذیل این گره می‌آیند را خدمت‌رسانی می‌کنند (برای شناخت این نماها به زیربخشِ نمودار مولفه مراجعه کنید).\
-این نماها با استفاده از پکیجِ nameko، درخواست‌های آمده را از روی صف‌های RabbitMQ خوانده و پاسخ را روی صف‌های دیگر و قرارداد شده از RabbitMQ می‌ریزند.
+And finally, we deploy the configuration related to the Model node. The processes resulting from deployment actually serve the requests that come to the facades of the component under this node (to understand these facades, refer to the sub-section on the component diagram).
+These facades, using the nameko package, read incoming requests from RabbitMQ queues and place the responses on other predefined RabbitMQ queues.
 
 ![third deploy](./resources/deploy/third_docker_compose.png)
 
-در نهایت دستورات `docker ps` و `docker image ls` نشان دهنده‌ی درستی اجرای نگهدارنده‌ها می‌باشند.\
-شایان ذکر است، که image های image های زیادی روی سیستم استقرار وجود دارد و البته database، message broker و NGINX استفاده شده پیش‌تر روی سیستم وجود داشتند.
+Finally, the commands docker ps and docker image ls indicate the correctness of the container execution.
 
 ![docker status](./resources/deploy/docker_status.png)
 
-## پایانه‌ها (endpoints)
-
+## Endpoints
 #### `POST` /api/data/patient/
-از طریق این پایانه می‌توان اطلاعات بیمار را وارد کرد. تصویر زیر نمونه درخواست روی این پایانه و نتیجه موفقیت آمیز را نشان می‌دهد.
+for storing the patients data.
 
 ![post patient](./resources/api/post_patient.png)
 
 #### `GET | PATCH | DELETE` /api/data/patient/<int:pk>
-روی این پایانه می‌توان بیمار با آیدی خاص را دریافت، آپدیت یا پاک نمود.تصویر زیر نمونه درخواست روی این پایانه و نتیجه موفقیت آمیز را نشان می‌دهد.
+for updating or deleting a specific patient using their ID.
 
 ![get patient](./resources/api/get_patient.png)
 
-
 #### `PATCH` /api/data/patient/<int:pk>/predict/
-روی این پایانه درخواست کرد با استفاده از مدل یادگیری ماشین، دیابت یک بیمار با آیدی خاص، پیش‌بینی شود. تصویر زیر نمونه درخواست روی این پایانه و نتیجه موفقیت آمیز را نشان می‌دهد.
+for predicting the result of a patient's test using the regression model.
 
 ![predict patient](./resources/api/predict_patient.png)
 
 ### `PATCH` /api/data/model/
-می‌توان با درخواست روی این پایانه، هایپرپارامترهای مدل یادگیری ماشین را تنظیم نمود. تصویر زیر نمونه درخواست روی این پایانه و نتیجه موفقیت آمیز را نشان می‌دهد. در درخواست زیر، هایپرپارامترِ decay که نشان می‌دهد مدل پس از یادگیری هر batch چند درصد از epsilon یادگیری خود می‌کاهد.
+for changing the model hyper-parameters.
 
 ![patch model](./resources/api/patch_model.png)
 
+# Questions
+Continuing with the answers to three questions:
 
-## پرسش‌ها
-در ادامه به پرسش‌ها پاسخ می‌دهیم.
-##### ۱. از چه نمودار/نمودارهای UML ای برای مدل‌سازی معماری MicroService خود استفاده کرده‌اید؟
-طبق اصول طراحی چابک، ابتدا نمودار استقرار که معماری سختِ پروژه و سپس نمودار مولفه که معماری نرم آن را نمایش می‌دهد رسم شدند. سپس پیاده‌سازی ذیل این مدل‌ها آغاز شد.
+### 1. Which UML diagrams have you used for modeling your MicroService architecture?
+According to agile design principles, we initially created a Deployment diagram to represent the project's infrastructure architecture, followed by a Component diagram to illustrate its software architecture. Implementation based on these models was then initiated.
 
-##### ۲. مفهوم Domain-driven Design یا DDD چه ارتباطی با معماری MicroService دارد؟ در حد دو-سه خط توضیح دهید.
-طراحی مبتنی بر حوزه یک روش ایجاد نرم‌افزار است که حول ایجاد با برنامه‌نویسی یک مدل دامنه که درک غنی از فرایند‌ها و قوانین حوزه دارد، تمرکز می‌کند (مارتین فولر).\
-به این ترتیب با استفاده از DDD می‌توان فضای مسئله را به بخش‌های قابل درک (حتی برای مشتری) شکست و ذیل این قطعات کوچکتر پاسخِ میکروسرویس به مساله داد.
+### 2. What is the relationship between Domain-driven Design (DDD) and MicroService architecture? Please explain in two to three sentences.
+Domain-driven Design (DDD) is a software development approach that focuses on building a domain model rich in understanding the domain's processes and rules. By using DDD, one can break down the problem space into understandable components, even from the customer's perspective, and assign Microservices to address these smaller problem components.
 
-##### ۳. آیا Docker Compose یک ابزار Orchestration است؟ در حد دو-سه خط توضیح دهید.
-ابزارهای ارکستر نرم‌افزاری، به ما کمک می‌کنند مولفه‌های نرم‌افزاری خود را به یکباره و بدون نیاز به قرار گرفتن روی محیط آن‌ها کنترل کنیم، تغییر اسکیل دهیم، و روی آن‌ها مانیتور داشته باشیم.\
-تمام این فعالیت‌ها با استفاده از docker-compose ممکن می‌شود.
-در فایل‌های پیکربندِ docker-compose چندین سرویسِ داکری قرار می‌گیرند که با استفاده از docker-compose در CLI استقرار آنها می تواند کنترل شود (مانند کاری که در این آزمایش انجام دادیم).
+### 3. Is Docker Compose an Orchestration tool? Please explain in two to three sentences.
+Orchestration tools in software help us control, scale, and monitor our software components simultaneously and without the need for manual intervention on their environments. All of these activities can be achieved using Docker Compose. Docker Compose allows multiple Docker services to be defined in configuration files, and it can be used via the CLI to orchestrate their deployment, much like what we did in this experiment.
